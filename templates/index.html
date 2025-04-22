@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sitemap URL Crawler</title>
+  <title>Sitemap URL Crawler - SEO 1</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -13,6 +13,7 @@
   <script src="https://unpkg.com/@fortawesome/fontawesome-free/js/all.js" crossorigin="anonymous"></script>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex flex-col text-gray-800 dark:text-gray-200">
+
   <!-- Header -->
   <header class="bg-white dark:bg-gray-800 shadow p-4 flex justify-between items-center">
     <h1 class="text-2xl font-bold text-blue-600">Sitemap Crawler - SEO 1</h1>
@@ -60,30 +61,29 @@
     const domains = document.getElementById("domainInput").value.trim().split(/\n+/);
     const status = document.getElementById("status");
     const results = document.getElementById("results");
-    status.innerHTML = "<i class='fas fa-spinner fa-spin'></i> Đang xử lý...";
+    status.innerHTML = "<i class='fas fa-spinner fa-spin'></i> Đang tìm sitemap và xử lý...";
     results.innerHTML = "";
 
     const res = await fetch("/api/crawl", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ urls: domains })
+      body: JSON.stringify({ domains: domains })
     });
 
     const data = await res.json();
-    status.innerHTML = "Hoàn tất!";
+    status.innerHTML = `Đã crawl được <strong>${data.urls.length}</strong> URLs!`;
 
-    data.forEach(site => {
-      const card = document.createElement("div");
-      card.className = "bg-white dark:bg-gray-800 p-4 rounded shadow";
-      card.innerHTML = `
-        <h3 class='font-bold text-lg text-blue-600'>${site.domain}</h3>
-        <p>${site.count || 0} URLs - ${site.duration || 0}s</p>
-        <div class='mt-2 max-h-40 overflow-y-auto text-sm'>
-          ${site.urls.map(url => `<div><a href='${url}' target='_blank' class='text-blue-500 hover:underline'>${url}</a></div>`).join('')}
-        </div>
-      `;
-      results.appendChild(card);
-    });
+    const card = document.createElement("div");
+    card.className = "bg-white dark:bg-gray-800 p-4 rounded shadow";
+    card.innerHTML = `
+      <h3 class='font-bold text-lg text-blue-600'>Kết quả Crawl</h3>
+      <p>Tổng cộng: ${data.urls.length} URLs</p>
+      <div class='mt-2 max-h-60 overflow-y-auto text-sm'>
+        ${data.urls.map(url => `<div><a href='${url}' target='_blank' class='text-blue-500 hover:underline'>${url}</a></div>`).join('')}
+      </div>
+    `;
+    results.appendChild(card);
+
     loadHistory();
   }
 
