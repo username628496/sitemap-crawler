@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sitemap URL Crawler</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class'
+    }
+  </script>
+  <script src="https://unpkg.com/@fortawesome/fontawesome-free/js/all.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex flex-col text-gray-800 dark:text-gray-200">
+  <!-- Header -->
+  <header class="bg-white dark:bg-gray-800 shadow p-4 flex justify-between items-center">
+    <h1 class="text-2xl font-bold text-blue-600">Sitemap Crawler - SEO 1</h1>
+    <button onclick="toggleTheme()" class="text-xl"><i class="fas fa-moon"></i></button>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 container mx-auto p-6">
+    <!-- Form Input -->
+    <div class="bg-white dark:bg-gray-800 p-6 rounded shadow mb-6">
+      <h2 class="text-xl font-semibold mb-4">Nhập Domains</h2>
+      <textarea id="domainInput" class="w-full border rounded p-3 mb-4 text-gray-900" rows="3" placeholder="Ví dụ: example.com"></textarea>
+      <div class="flex flex-wrap gap-3">
+        <button onclick="crawl()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"><i class="fas fa-search"></i> Crawl</button>
+        <button onclick="copyAllUrls()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"><i class="fas fa-copy"></i> Copy All URLs</button>
+        <button onclick="exportCSV()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"><i class="fas fa-file-csv"></i> Export CSV</button>
+        <a href="https://sinbyte.com/" target="_blank" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 flex items-center"><i class="fas fa-external-link-alt mr-2"></i>Open Sinbyte</a>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div id="status" class="mb-4 text-center text-gray-600"></div>
+
+    <!-- Results -->
+    <div id="results" class="grid gap-4"></div>
+
+    <!-- History -->
+    <div class="bg-white dark:bg-gray-800 p-6 rounded shadow mt-10">
+      <h2 class="text-xl font-semibold mb-4">Lịch sử Crawl</h2>
+      <ul id="history" class="list-disc pl-5"></ul>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white dark:bg-gray-800 text-center p-4 text-sm text-gray-500 dark:text-gray-400">
+    Thiết kế & lập trình bởi <strong>SEO1</strong> © 2025
+  </footer>
+
+<script>
+  function toggleTheme() {
+    document.documentElement.classList.toggle('dark');
+  }
+
+  async function crawl() {
+    const domains = document.getElementById("domainInput").value.trim().split(/\n+/);
+    const status = document.getElementById("status");
+    const results = document.getElementById("results");
+    status.innerHTML = "<i class='fas fa-spinner fa-spin'></i> Đang xử lý...";
+    results.innerHTML = "";
+
+    const res = await fetch("/api/crawl", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ urls: domains })
+    });
+
+    const data = await res.json();
+    status.innerHTML = "Hoàn tất!";
+
+    data.forEach(site => {
+      const card = document.createElement("div");
+      card.className = "bg-white dark:bg-gray-800 p-4 rounded shadow";
+      card.innerHTML = `
+        <h3 class='font-bold text-lg text-blue-600'>${site.domain}</h3>
+        <p>${site.count || 0} URLs - ${site.duration || 0}s</p>
+        <div class='mt-2 max-h-40 overflow-y-auto text-sm'>
+          ${site.urls.map(url => `<div><a href='${url}' target='_blank' class='text-blue-500 hover:underline'>${url}</a></div>`).join('')}
+        </div>
+      `;
+      results.appendChild(card);
+    });
+    loadHistory();
+  }
+
+  function copyAllUrls() {
+    const links = document.querySelectorAll("#results a");
+    const allText = Array.from(links).map(a => a.href).join("\n");
+    navigator.clipboard.writeText(allText).then(() => alert("Đã sao chép tất cả URLs!"));
+  }
+
+  async function exportCSV() {
+    const links = document.querySelectorAll("#results a");
+    const urls = Array.from(links).map(a => a.href);
+    const res = await fetch('/api/export', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ urls: urls, type: 'csv' })
+    });
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "urls.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  async function loadHistory() {
+    const res = await fetch("/api/history");
+    const data = await res.json();
+    const history = document.getElementById("history");
+    history.innerHTML = data.map(item => `<li>${item.timestamp} - ${item.domain} (${item.url_count} URL)</li>`).join('');
+  }
+
+  window.onload = loadHistory;
+</script>
+</body>
+</html>
