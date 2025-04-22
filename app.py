@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 import requests
 import xml.etree.ElementTree as ET
-from urllib.parse import urljoin
 from datetime import datetime
 import time, json, os, csv
 from io import StringIO
@@ -16,58 +15,59 @@ if not os.path.exists(HISTORY_FILE):
     with open(HISTORY_FILE, 'w') as f:
         json.dump([], f)
 
-def fetch_xml(url):
+def fetch_url(url):
+    headers = {'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'}
     try:
-        res = requests.get(url, timeout=10, allow_redirects=True)
+        res = requests.get(url, headers=headers, timeout=10)
         res.raise_for_status()
-        return res.content, res.url if res.history else None
-    except Exception as e:
-        print(f"Lỗi khi tải sitemap {url}:", e)
-        return None, None
+        return res.text
+    except:
+        return None
 
-def parse_recursive(xml_data, depth=0):
+def discover_sitemaps(domain):
+    sitemaps = []
+    robots_url = f"https://{domain}/robots.txt"
+    robots_txt = fetch_url(robots_url)
+    if robots_txt:
+        for line in robots_txt.splitlines():
+            if line.lower().startswith('sitemap:'):
+                sitemap_url = line.split(':', 1)[1].strip()
+                sitemaps.append(sitemap_url)
+    if not sitemaps:
+        common_paths = ['sitemap.xml', 'sitemap_index.xml']
+        for path in common_paths:
+            test_url = f"https://{domain}/{path}"
+            if fetch_url(test_url):
+                sitemaps.append(test_url)
+    return sitemaps
+
+def parse_sitemap(url):
     urls = []
+    xml_data = fetch_url(url)
+    if not xml_data:
+        return urls
     try:
         root = ET.fromstring(xml_data)
-        ns = {"ns": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-
-        for loc in root.findall(".//ns:url/ns:loc", ns):
+        ns = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+        for loc in root.findall('.//ns:url/ns:loc', ns):
             urls.append(loc.text)
-
-        for sitemap in root.findall(".//ns:sitemap/ns:loc", ns):
-            child_url = sitemap.text
-            print("→ Đang phân tích:", child_url)
-            child_xml, _ = fetch_xml(child_url)
-            if child_xml:
-                urls.extend(parse_recursive(child_xml, depth + 1))
-    except Exception as e:
-        print("Lỗi khi phân tích XML:", e)
+        for sitemap in root.findall('.//ns:sitemap/ns:loc', ns):
+            urls.extend(parse_sitemap(sitemap.text))
+    except:
+        pass
     return urls
 
 def save_history(domain, url_count, duration):
-    history = []
-    if os.path.exists(HISTORY_FILE):
-        with open(HISTORY_FILE, 'r') as f:
-            history = json.load(f)
-
+    with open(HISTORY_FILE, 'r') as f:
+        history = json.load(f)
     history.insert(0, {
         "domain": domain,
         "url_count": url_count,
         "duration_sec": round(duration, 2),
         "timestamp": datetime.now().isoformat()
     })
-
     with open(HISTORY_FILE, 'w') as f:
-        json.dump(history[:20], f)  # giữ 20 dòng gần nhất
-
-def normalize_url(raw_url):
-    if not raw_url.startswith("http"):
-        raw_url = "https://" + raw_url
-    if not raw_url.endswith(".xml"):
-        if not raw_url.endswith("/"):
-            raw_url += "/"
-        raw_url += "sitemap.xml"
-    return raw_url
+        json.dump(history[:20], f)
 
 @app.route('/')
 def index():
@@ -76,48 +76,23 @@ def index():
 @app.route('/api/crawl', methods=['POST'])
 def crawl():
     data = request.get_json()
-    raw_urls = data.get("urls")
-    include = data.get("include")
-    exclude = data.get("exclude")
+    domains = data.get("domains", [])
 
-    if not raw_urls:
-        return jsonify({"error": "Thiếu URL"}), 400
+    if not domains:
+        return jsonify({"error": "Thiếu domain"}), 400
 
-    all_results = []
+    all_urls = []
+    for domain in domains:
+        domain = domain.replace('https://','').replace('http://','').strip('/')
+        sitemaps = discover_sitemaps(domain)
+        for sitemap_url in sitemaps:
+            start = time.time()
+            urls = parse_sitemap(sitemap_url)
+            duration = time.time() - start
+            save_history(domain, len(urls), duration)
+            all_urls.extend(urls)
 
-    for base_url in raw_urls:
-        base_url = normalize_url(base_url)
-
-        start = time.time()
-
-        xml_data, redirected_to = fetch_xml(base_url)
-        if not xml_data:
-            all_results.append({
-                "domain": base_url,
-                "error": "Không thể tải sitemap",
-                "urls": []
-            })
-            continue
-
-        urls = parse_recursive(xml_data)
-
-        if include:
-            urls = [u for u in urls if include in u]
-        if exclude:
-            urls = [u for u in urls if exclude not in u]
-
-        duration = time.time() - start
-        save_history(base_url, len(urls), duration)
-
-        all_results.append({
-            "domain": base_url,
-            "redirected_to": redirected_to,
-            "count": len(urls),
-            "duration": round(duration, 2),
-            "urls": urls
-        })
-
-    return jsonify(all_results)
+    return jsonify({"urls": all_urls})
 
 @app.route('/api/history')
 def get_history():
@@ -130,42 +105,16 @@ def export_urls():
     data = request.get_json()
     urls = data.get("urls", [])
     export_type = data.get("type", "csv")
-
     if export_type == "txt":
         return Response("\n".join(urls), mimetype="text/plain",
                         headers={"Content-Disposition": "attachment; filename=urls.txt"})
-
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow(["URL"])
     for u in urls:
         writer.writerow([u])
-
     return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=urls.csv"})
 
-@app.route('/api/check-index', methods=['POST'])
-def check_index():
-    data = request.get_json()
-    urls = data.get("urls", [])
-    results = []
-
-    for url in urls:
-        status = get_index_status(url)
-        results.append({"url": url, "status": status})
-
-    return jsonify(results)
-
-def get_index_status(url):
-    try:
-        res = requests.get(url, timeout=10)
-        if 'noindex' in res.headers.get('X-Robots-Tag', '').lower():
-            return 'Noindex'
-        if '<meta name="robots"' in res.text.lower() and 'noindex' in res.text.lower():
-            return 'Noindex'
-        return 'Index'
-    except:
-        return 'Lỗi'
-
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=False)
