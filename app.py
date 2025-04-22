@@ -1,3 +1,5 @@
+# app.py - Updated Version
+
 from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 import requests
@@ -10,18 +12,18 @@ app = Flask(__name__)
 CORS(app)
 
 HISTORY_FILE = 'crawl_history.json'
-
 if not os.path.exists(HISTORY_FILE):
     with open(HISTORY_FILE, 'w') as f:
         json.dump([], f)
 
 def fetch_url(url):
-    headers = {'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36'}
     try:
         res = requests.get(url, headers=headers, timeout=10)
         res.raise_for_status()
         return res.text
-    except:
+    except Exception as e:
+        print(f"[Lỗi] Không truy cập được: {url}")
         return None
 
 def discover_sitemaps(domain):
@@ -34,8 +36,7 @@ def discover_sitemaps(domain):
                 sitemap_url = line.split(':', 1)[1].strip()
                 sitemaps.append(sitemap_url)
     if not sitemaps:
-        common_paths = ['sitemap.xml', 'sitemap_index.xml']
-        for path in common_paths:
+        for path in ['sitemap.xml', 'sitemap_index.xml']:
             test_url = f"https://{domain}/{path}"
             if fetch_url(test_url):
                 sitemaps.append(test_url)
@@ -53,8 +54,8 @@ def parse_sitemap(url):
             urls.append(loc.text)
         for sitemap in root.findall('.//ns:sitemap/ns:loc', ns):
             urls.extend(parse_sitemap(sitemap.text))
-    except:
-        pass
+    except Exception as e:
+        print(f"[Lỗi XML] {url}")
     return urls
 
 def save_history(domain, url_count, duration):
@@ -81,18 +82,26 @@ def crawl():
     if not domains:
         return jsonify({"error": "Thiếu domain"}), 400
 
-    all_urls = []
+    results = []
     for domain in domains:
-        domain = domain.replace('https://','').replace('http://','').strip('/')
-        sitemaps = discover_sitemaps(domain)
+        domain_clean = domain.replace('https://','').replace('http://','').strip('/')
+        sitemaps = discover_sitemaps(domain_clean)
+        domain_result = {"domain": domain_clean, "sitemaps": []}
         for sitemap_url in sitemaps:
             start = time.time()
             urls = parse_sitemap(sitemap_url)
             duration = time.time() - start
-            save_history(domain, len(urls), duration)
-            all_urls.extend(urls)
+            domain_result["sitemaps"].append({
+                "sitemap": sitemap_url,
+                "count": len(urls),
+                "urls": list(set(urls)),
+                "duration": round(duration, 2)
+            })
+        total_urls = sum(len(s["urls"]) for s in domain_result["sitemaps"])
+        save_history(domain_clean, total_urls, duration)
+        results.append(domain_result)
 
-    return jsonify({"urls": all_urls})
+    return jsonify(results)
 
 @app.route('/api/history')
 def get_history():
