@@ -3,116 +3,349 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sitemap URL Crawler</title>
+  <title>Sitemap Crawler - SEO1</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    tailwind.config = { darkMode: 'class' }
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            softbg: '#fdfcf9',
+            softgray: '#3c3c3c',
+            accent: '#e08b6d',
+            lightborder: '#eaeaea',
+          },
+          borderRadius: {
+            xl: '1.25rem'
+          },
+          boxShadow: {
+            soft: '0 2px 8px rgba(0, 0, 0, 0.04)',
+          }
+        }
+      }
+    }
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://unpkg.com/@fortawesome/fontawesome-free/js/all.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://unpkg.com/nprogress@0.2.0/nprogress.css" />
+  <script src="https://unpkg.com/nprogress@0.2.0/nprogress.js"></script>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex flex-col text-gray-800 dark:text-gray-200">
-  <header class="bg-white dark:bg-gray-800 shadow p-4 flex justify-between items-center">
-    <h1 class="text-2xl font-bold text-blue-600">Tool Sitemap Crawler - SEO 1 🚀  </h1>
-    <button onclick="toggleTheme()" class="text-xl"><i class="fas fa-moon"></i></button>
-  </header>
+<body class="bg-softbg text-softgray font-sans min-h-screen">
+  <div class="max-w-3xl mx-auto p-6">
+    <header class="mb-10 text-center relative">
+      <h1 class="text-3xl font-semibold inline-flex items-center justify-center gap-2 relative group cursor-pointer">
+        Sitemap URL Crawler - SEO 1
+        <span class="text-sm text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-300 inline-flex items-center gap-1">
+          V2
+          <i class="fas fa-circle-info text-gray-400"></i>
+        </span>
+    
+        <!-- Tooltip Box -->
+        <div class="absolute top-full mt-3 left-1/2 transform -translate-x-1/2 z-50 hidden group-hover:block group-focus:block w-[320px] text-left text-sm bg-white border border-gray-200 rounded-lg shadow-md p-4 text-gray-700">
+          <strong class="text-gray-800 block mb-2">Thông Tin Version 2</strong>
+          <ul class="list-disc list-inside space-y-1 text-[13px]">
+            <li>Crawl nhiều domain cùng lúc</li>
+            <li>Xử lý nhanh hơn</li>
+            <li>Có tiến trình và thời gian rõ ràng</li>
+            <li>Báo lỗi khi domain bị Cloudflare chặn</li>
+          </ul>
+        </div>
+      </h1>
+    </header>
 
-  <main class="flex-1 container mx-auto p-6">
-    <div class="bg-white dark:bg-gray-800 p-6 rounded shadow mb-6">
-      <h2 class="text-xl font-semibold mb-4">Nhập Domains</h2>
-      <textarea id="domainInput" class="w-full border rounded p-3 mb-4 text-gray-900" rows="3" placeholder="Ví dụ: example.com"></textarea>
-      <div class="flex flex-wrap gap-3">
-        <button onclick="crawl()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"><i class="fas fa-search"></i> Crawl</button>
-        <button onclick="copyAllUrls()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"><i class="fas fa-copy"></i> Copy All URLs</button>
-        <button onclick="exportCSV()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"><i class="fas fa-file-csv"></i> Export CSV</button>
-        <a href="https://sinbyte.com/" target="_blank" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 flex items-center"><i class="fas fa-external-link-alt mr-2"></i>Open Sinbyte</a>
+    <section class="bg-white border border-lightborder shadow-soft rounded-xl p-6">
+      <label for="domainInput" class="block mb-3 text-sm font-medium">Nhập domain (mỗi dòng 1 domain):</label>
+      <textarea id="domainInput" class="w-full border border-lightborder rounded-md p-3 text-sm bg-softbg text-softgray outline-none focus:ring-accent focus:border-accent" rows="10" placeholder="example.com"></textarea>
+      <div class="flex flex-wrap gap-3 justify-end mt-4">
+        <div class="flex flex-wrap gap-3 mt-4">
+          <button onclick="crawlStream()" class="bg-[#dc8863] hover:bg-[#cf7a5b] text-white font-semibold px-4 py-2 text-sm rounded-[10px] shadow inline-flex items-center gap-2">
+            <i class="fas fa-search"></i>
+            Crawl
+          </button>
+          <button onclick="copyAllUrls()" class="bg-[#22c55e] hover:bg-[#16a34a] text-white font-semibold px-4 py-2 text-sm rounded-[10px] shadow inline-flex items-center gap-2">
+            <i class="fas fa-copy"></i>
+            Copy URL
+          </button>
+          <button onclick="exportCSV()" class="bg-[#facc15] hover:bg-[#eab308] text-white font-semibold px-4 py-2 text-sm rounded-[10px] shadow inline-flex items-center gap-2">
+            <i class="fas fa-file-csv"></i>
+            Export CSV
+          </button>
+          <a href="https://sinbyte.com/" target="_blank"
+   class="inline-flex items-center gap-2 px-5 py-2 rounded-[10px] text-white bg-blue-600 hover:bg-blue-700 transition shadow text-sm font-medium">
+   <i class="fas fa-external-link-alt"></i> Open Sinbyte
+</a>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <div id="status" class="mb-4 text-center text-gray-600"></div>
-    <div id="results" class="grid gap-4"></div>
+    <div id="status" class="text-center mt-6 text-sm"></div>
 
-    <div class="bg-white dark:bg-gray-800 p-6 rounded shadow mt-10">
-      <h2 class="text-xl font-semibold mb-4">Lịch sử Crawl</h2>
-      <ul id="history" class="list-disc pl-5"></ul>
-    </div>
-  </main>
+    <section id="results" class="mt-6 space-y-4"></section>
 
-  <footer class="bg-white dark:bg-gray-800 text-center p-4 text-sm text-gray-500 dark:text-gray-400">
-    Thiết kế & lập trình bởi <strong>SEO1 🚀 </strong> © 2025
-  </footer>
+    <section class="mt-10">
+      <h2 class="text-lg font-semibold mb-4">Lịch sử Crawl</h2>
+      <div id="history" class="space-y-2 text-sm"></div>
+    </section>
 
-<script>
-function toggleTheme() {
-  document.documentElement.classList.toggle('dark');
-}
+    <footer class="text-center text-xs text-gray-500 mt-10">
+      П и тер © 2025 - Bản Quyền Thuộc Về SEO 1
+    </footer>
+  </div>
 
-async function crawl() {
-  const domains = document.getElementById("domainInput").value.trim().split(/\n+/);
-  const status = document.getElementById("status");
-  const results = document.getElementById("results");
-  status.innerHTML = "<i class='fas fa-spinner fa-spin'></i> Đang crawl... Anh Em chờ xíu nhé";
-  results.innerHTML = "";
-
-  const res = await fetch("/api/crawl", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ domains: domains })
-  });
-
-  const data = await res.json();
-  status.innerHTML = "Đã hoàn thành crawl! Chúc Anh Em on top bền vững 🫡 ";
-
-  data.forEach(site => {
-    const card = document.createElement("div");
-    card.className = "bg-white dark:bg-gray-800 p-4 rounded shadow";
-    let content = `<h3 class='font-bold text-lg text-blue-600'>${site.domain}</h3>`;
-    site.sitemaps.forEach(sm => {
-      content += `<p class='text-yellow-500 mt-2'>Sitemap: ${sm.sitemap} (${sm.urls.length} URLs)</p>`;
-      content += `<div class='mt-1 text-sm'>` + sm.urls.map(url => `<div><a href='${url}' target='_blank' class='text-blue-500 hover:underline'>${url}</a></div>`).join('') + `</div>`;
-    });
-    card.innerHTML = content;
-    results.appendChild(card);
-   });
-
-
-  loadHistory();
-}
-
-function copyAllUrls() {
-  const links = document.querySelectorAll("#results a");
-  const urlSet = new Set(Array.from(links).map(a => a.href));  // Loại bỏ trùng
-  navigator.clipboard.writeText(Array.from(urlSet).join("\n")).then(() => {
-    alert(`✅ Đã sao chép ${urlSet.size} URL duy nhất!`);
-  });
-}
-
-
-async function exportCSV() {
+  <script>
+    function toggleTheme() {
+      document.documentElement.classList.toggle('dark');
+    }
+    
+    function crawlStream() {
+      const domains = document.getElementById("domainInput").value.trim().split(/\n+/);
+      const status = document.getElementById("status");
+      const results = document.getElementById("results");
+    
+      results.innerHTML = "";
+      status.innerHTML = "";
+      let completed = 0;
+      const total = domains.length;
+    
+      NProgress.start();
+      NProgress.set(0);
+    
+      status.innerHTML = `
+        <div class="inline-flex items-center px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg shadow text-sm font-medium animate-pulse">
+          <i class="fas fa-spinner fa-spin mr-2"></i> Đang xử lý: ${completed} / ${total} domain
+        </div>`;
+    
+      const source = new EventSource(`/api/crawl-stream?domains=${domains.join(",")}`);
+    
+      let successDomains = [], failedDomains = [];
+    
+      source.onmessage = function(event) {
+        const site = JSON.parse(event.data);
+        const card = document.createElement("div");
+        card.className = "bg-white dark:bg-gray-800 p-4 rounded-[10px] shadow transition-all duration-300 ease-in-out border border-gray-200 dark:border-gray-700";    
+        if (site.status === "success") successDomains.push(site.domain);
+        else failedDomains.push(site.domain);
+    
+        const uniqueUrls = new Set();
+        if (site.status === "success") {
+          site.sitemaps.forEach(sm => sm.urls.forEach(url => uniqueUrls.add(url)));
+        }
+    
+        const copyBtn = site.status === "success" ? `
+          <button onclick="navigator.clipboard.writeText(\`${Array.from(uniqueUrls).join('\n')}\`).then(() => {
+            Swal.fire({
+              icon: 'success',
+              title: '✅ Đã sao chép!',
+              html: 'Tổng cộng <strong>${uniqueUrls.size}</strong> URL duy nhất đã được sao chép.<br>Chúc anh em <strong>SEO 1</strong> on top bền vững 💪',
+              toast: true,
+              position: 'top-end',
+              showConfirmButton: false,
+              timer: 3000,
+              timerProgressBar: true,
+              background: '#f0fdf4',
+              color: '#166534',
+              didOpen: toast => {
+                toast.addEventListener('mouseenter', Swal.stopTimer)
+                toast.addEventListener('mouseleave', Swal.resumeTimer)
+              }
+            });
+          })"
+          class="inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded shadow ml-3">
+          <i class="fas fa-copy mr-2"></i>Sao chép URL
+        </button>` : '';
+    
+        const statusBadge = site.status === "failed"
+          ? `<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-800"><i class="fas fa-exclamation-circle mr-1"></i> Thất bại</span>`
+          : `<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i> Thành công</span>`;
+    
+        let content = `
+          <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <h3 class='font-bold text-lg text-blue-600 flex items-center'>
+              <i class="fas fa-globe mr-2"></i>${site.domain}
+            </h3>
+            <div class="flex items-center gap-2">
+              ${statusBadge}
+              ${copyBtn}
+            </div>
+          </div>`;
+    
+        if (site.status === "failed") {
+          content += `
+            <div class="flex items-start gap-2 text-sm bg-red-50 border border-red-200 text-red-700 rounded p-3 mt-2">
+              <i class="fas fa-exclamation-triangle mt-1"></i>
+              <div><strong>Lỗi:</strong> ${site.error || "Không xác định"}</div>
+            </div>`;
+        } else {
+          site.sitemaps.forEach((sm, idx) => {
+            const uid = `${site.domain.replace(/\W/g, "")}-sm-${idx}`;
+            content += `
+              <div class="mt-4 border border-yellow-300 rounded-md bg-yellow-50 dark:bg-yellow-100/10">
+                <button onclick="document.getElementById('${uid}').classList.toggle('hidden')"
+                  class="w-full text-left px-4 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-medium rounded-t flex justify-between items-center">
+                  <span><i class="fas fa-sitemap mr-2"></i><a href="${sm.sitemap}" target="_blank" class="underline">${sm.sitemap}</a></span>
+                  <span class="text-sm">(${sm.urls.length} URLs, ${sm.duration}s)</span>
+                </button>
+                <div id="${uid}" class="hidden max-h-60 overflow-y-auto px-4 py-2 bg-white dark:bg-gray-900 text-sm border-t border-yellow-200">
+                  ${sm.urls.map(url => `<div><a href="${url}" target="_blank" class="text-blue-500 hover:underline">${url}</a></div>`).join('')}
+                </div>
+              </div>`;
+          });
+        }
+    
+        card.innerHTML = content;
+        results.appendChild(card);
+        loadHistory();
+    
+        completed++;
+        NProgress.set(completed / total);
+        status.innerHTML = `
+          <div class="inline-flex items-center px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg shadow text-sm font-medium">
+            <i class="fas fa-spinner mr-2 animate-spin"></i> Đang xử lý: ${completed} / ${total} domain
+          </div>`;
+    
+        if (completed === total) {
+          NProgress.done();
+          const formatList = (list) => list.map((d, i) => `${i + 1}. ${d}`).join('<br>');
+          const successFormatted = formatList(successDomains) || '—';
+          const failedFormatted = formatList(failedDomains) || '—';
+    
+          status.innerHTML = `
+            <div class="relative group inline-block">
+              <div class="inline-flex items-center px-4 py-2 bg-green-100 text-green-800 rounded-full shadow-md text-sm font-semibold cursor-default">
+                <i class="fas fa-check-circle mr-2"></i>
+                Crawl hoàn tất: ${completed} / ${total}
+                <span class="ml-2 text-xs">(✔️ ${successDomains.length} | ❌ ${failedDomains.length})</span>
+              </div>
+              <div class="absolute hidden group-hover:block bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg w-72 p-4 z-50 top-full mt-2">
+                <div><strong class="text-green-600">✔️ Thành công:</strong><br><div class="text-green-700">${successFormatted}</div></div>
+                ${failedDomains.length > 0 ? `<hr class="my-2 border-gray-300 dark:border-gray-600" /><strong class="text-red-600">❌ Thất bại:</strong><br><div class="text-red-700">${failedFormatted}</div>` : ``}
+              </div>
+            </div>`;
+          source.close();
+        }
+      };
+    
+      source.onerror = function() {
+        source.close();
+        NProgress.done();
+        status.innerHTML = `
+          <div class="inline-flex items-center px-4 py-2 bg-red-100 text-red-800 rounded-lg shadow text-sm font-medium">
+            <i class="fas fa-exclamation-triangle mr-2"></i> Anh em chưa nhập URL
+          </div>`;
+      };
+    }
+    
+    function copyAllUrls() {
   const links = document.querySelectorAll("#results a");
   const urlSet = new Set(Array.from(links).map(a => a.href));
-  const res = await fetch('/api/export', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ urls: Array.from(urlSet), type: 'csv' })
-  });
-  const blob = await res.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = "unique_urls.csv";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
+  const uniqueUrls = Array.from(urlSet);
 
-async function loadHistory() {
+  if (uniqueUrls.length === 0) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Chưa có URLs nào',
+      text: 'Anh em crawl sitemap trước nha!',
+      background: '#FAFAF9',
+      color: '#444',
+      position: 'center',
+      confirmButtonText: 'OK',
+      customClass: {
+        popup: 'rounded-xl border border-gray-200 shadow-sm px-6 py-5',
+        title: 'text-base font-semibold text-yellow-600',
+        confirmButton: 'bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 focus:outline-none'
+      }
+    });
+    return;
+  }
+
+  navigator.clipboard.writeText(uniqueUrls.join("\n")).then(() => {
+    Swal.fire({
+      icon: 'success',
+      title: 'Đã sao chép thành công',
+      html: `
+        <p class="text-base text-gray-600">
+          <strong>${uniqueUrls.length}</strong> URL duy nhất đã được sao chép.
+        </p>
+        <p class="mt-2 text-sm text-gray-500">Chúc anh em <strong class="font-semibold">SEO 1</strong> on top bền vững 💪</p>`,
+      background: '#FAFAF9',
+      color: '#444',
+      showConfirmButton: false,
+      timer: 3500,
+      timerProgressBar: true,
+      position: 'center',
+      customClass: {
+        popup: 'rounded-xl border border-gray-200 shadow-md px-6 py-6',
+        title: 'text-lg font-semibold text-green-700'
+      },
+      didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer);
+        toast.addEventListener('mouseleave', Swal.resumeTimer);
+      }
+    });
+  });
+}
+    
+    
+    async function exportCSV() {
+      const links = document.querySelectorAll("#results a");
+      const urlSet = new Set(Array.from(links).map(a => a.href));
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ urls: Array.from(urlSet), type: 'csv' })
+      });
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "unique_urls.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+    
+    async function loadHistory() {
   const res = await fetch("/api/history");
   const data = await res.json();
   const history = document.getElementById("history");
-  history.innerHTML = data.map(item => `<li>${item.timestamp} - ${item.domain} (${item.url_count} URL)</li>`).join('');
-}
 
-window.onload = loadHistory;
-</script>
+  if (!Array.isArray(data) || data.length === 0) {
+    history.innerHTML = `<div class="text-gray-500 text-sm italic">Chưa có lịch sử nào.</div>`;
+    return;
+  }
+
+  history.innerHTML = data.map(record => {
+    const isSuccess = record.status === "success";
+    const badgeClass = isSuccess ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700";
+    const badgeText = isSuccess ? "✔️ Thành công" : "❌ Thất bại";
+
+    // Format timestamp cho đẹp
+    const timestamp = new Date(record.timestamp).toLocaleString("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      hour12: false
+    });
+
+    return `
+      <div class="flex flex-wrap sm:flex-nowrap justify-between items-center px-4 py-2 border rounded shadow-sm bg-white dark:bg-gray-800 hover:shadow-md transition-all text-sm">
+        <div class="flex flex-wrap items-center gap-2 text-gray-700 dark:text-gray-300">
+          <span class="text-gray-500"><i class="far fa-clock mr-1"></i>${timestamp}</span>
+          <a href="https://${record.domain}" target="_blank" class="text-blue-600 font-semibold hover:underline">
+            <i class="fas fa-globe mr-1"></i>${record.domain}
+          </a>
+          <span class="text-gray-500">${record.url_count} URL • ${record.duration_sec}s</span>
+        </div>
+        <div class="mt-2 sm:mt-0 sm:ml-4">
+          <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${badgeClass}">
+            ${badgeText}
+          </span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+    
+    window.onload = loadHistory;
+    </script>
 </body>
 </html>

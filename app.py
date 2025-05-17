@@ -1,12 +1,13 @@
-# app.py - Updated Version
-
 from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 import requests
 import xml.etree.ElementTree as ET
+from xml.etree.ElementTree import ParseError
 from datetime import datetime
 import time, json, os, csv
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import StringIO
+import pytz
 
 app = Flask(__name__)
 CORS(app)
@@ -17,14 +18,31 @@ if not os.path.exists(HISTORY_FILE):
         json.dump([], f)
 
 def fetch_url(url):
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36'}
+    headers = {
+        'User-Agent': (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+            '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        ),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
     try:
         res = requests.get(url, headers=headers, timeout=10)
         res.raise_for_status()
         return res.text
-    except Exception as e:
-        print(f"[Lỗi] Không truy cập được: {url}")
-        return None
+    except requests.exceptions.HTTPError as e:
+        if res.status_code == 403:
+            raise Exception(f"403 Forbidden – Trang từ chối truy cập: {url}")
+        raise Exception(f"Lỗi HTTP {res.status_code} – {url}")
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Không thể kết nối: {url} – {str(e)}")
+
+def is_valid_xml(text):
+    try:
+        ET.fromstring(text)
+        return True
+    except ET.ParseError:
+        return False
 
 def discover_sitemaps(domain):
     sitemaps = []
@@ -34,41 +52,87 @@ def discover_sitemaps(domain):
         for line in robots_txt.splitlines():
             if line.lower().startswith('sitemap:'):
                 sitemap_url = line.split(':', 1)[1].strip()
-                sitemaps.append(sitemap_url)
+                content = fetch_url(sitemap_url)
+                if content and is_valid_xml(content):
+                    sitemaps.append(sitemap_url)
     if not sitemaps:
         for path in ['sitemap.xml', 'sitemap_index.xml']:
-            test_url = f"https://{domain}/{path}"
-            if fetch_url(test_url):
-                sitemaps.append(test_url)
+            url = f"https://{domain}/{path}"
+            content = fetch_url(url)
+            if content and is_valid_xml(content):
+                sitemaps.append(url)
     return sitemaps
 
 def parse_sitemap(url):
     urls = []
     xml_data = fetch_url(url)
     if not xml_data:
-        return urls
+        raise Exception("Không tải được sitemap")
     try:
         root = ET.fromstring(xml_data)
         ns = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
         for loc in root.findall('.//ns:url/ns:loc', ns):
             urls.append(loc.text)
         for sitemap in root.findall('.//ns:sitemap/ns:loc', ns):
-            urls.extend(parse_sitemap(sitemap.text))
-    except Exception as e:
-        print(f"[Lỗi XML] {url}")
+            urls.extend(parse_sitemap(sitemap.text.strip()))
+    except ParseError as e:
+        raise Exception(f"XML lỗi: {str(e)}")
     return urls
 
-def save_history(domain, url_count, duration):
-    with open(HISTORY_FILE, 'r') as f:
-        history = json.load(f)
+def save_history(domain, url_count, duration, status, urls):
+    history = []
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, 'r') as f:
+                history = json.load(f)
+        except json.JSONDecodeError:
+            history = []
+
+    tz = pytz.timezone("Asia/Ho_Chi_Minh")
+    timestamp = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
     history.insert(0, {
         "domain": domain,
         "url_count": url_count,
         "duration_sec": round(duration, 2),
-        "timestamp": datetime.now().isoformat()
+        "timestamp": timestamp,
+        "status": status,
+        "urls": urls[:200]
     })
+
     with open(HISTORY_FILE, 'w') as f:
-        json.dump(history[:20], f)
+        json.dump(history[:50], f, ensure_ascii=False, indent=2)
+
+def process_domain(domain):
+    domain_clean = domain.replace('https://','').replace('http://','').strip('/')
+    result = {"domain": domain_clean, "sitemaps": [], "status": "success"}
+    all_urls = []
+    try:
+        sitemaps = discover_sitemaps(domain_clean)
+        if not sitemaps:
+            raise Exception("Không tìm thấy sitemap")
+
+        for sitemap_url in sitemaps:
+            start = time.time()
+            urls = parse_sitemap(sitemap_url)
+            duration = time.time() - start
+            urls = list(set(urls))
+            all_urls.extend(urls)
+            result["sitemaps"].append({
+                "sitemap": sitemap_url,
+                "count": len(urls),
+                "urls": urls,
+                "duration": round(duration, 2)
+            })
+
+        total_urls = len(set(all_urls))
+        save_history(domain_clean, total_urls, duration, result["status"], list(set(all_urls)))
+
+    except Exception as e:
+        result["status"] = "failed"
+        result["error"] = str(e)
+        save_history(domain_clean, 0, 0, "failed", [])
+
+    return result
 
 @app.route('/')
 def index():
@@ -78,36 +142,41 @@ def index():
 def crawl():
     data = request.get_json()
     domains = data.get("domains", [])
-
     if not domains:
         return jsonify({"error": "Thiếu domain"}), 400
-
     results = []
-    for domain in domains:
-        domain_clean = domain.replace('https://','').replace('http://','').strip('/')
-        sitemaps = discover_sitemaps(domain_clean)
-        domain_result = {"domain": domain_clean, "sitemaps": []}
-        for sitemap_url in sitemaps:
-            start = time.time()
-            urls = parse_sitemap(sitemap_url)
-            duration = time.time() - start
-            domain_result["sitemaps"].append({
-                "sitemap": sitemap_url,
-                "count": len(urls),
-                "urls": list(set(urls)),
-                "duration": round(duration, 2)
-            })
-        total_urls = sum(len(s["urls"]) for s in domain_result["sitemaps"])
-        save_history(domain_clean, total_urls, duration)
-        results.append(domain_result)
-
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(process_domain, d) for d in domains]
+        for future in as_completed(futures):
+            results.append(future.result())
     return jsonify(results)
+
+@app.route('/api/crawl-stream')
+def crawl_stream():
+    def stream(domains):
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = {executor.submit(process_domain, d): d for d in domains}
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                except Exception as e:
+                    result = {
+                        "domain": futures[future],
+                        "status": "failed",
+                        "error": str(e)
+                    }
+                yield f"data: {json.dumps(result)}\n\n"
+    domains = request.args.get("domains", "")
+    domain_list = domains.split(",") if domains else []
+    return Response(stream(domain_list), content_type='text/event-stream')
 
 @app.route('/api/history')
 def get_history():
-    with open(HISTORY_FILE, 'r') as f:
-        data = json.load(f)
-    return jsonify(data)
+    try:
+        with open(HISTORY_FILE, 'r') as f:
+            return jsonify(json.load(f))
+    except Exception as e:
+        return jsonify({"error": f"Lỗi đọc lịch sử: {str(e)}"}), 500
 
 @app.route('/api/export', methods=['POST'])
 def export_urls():
