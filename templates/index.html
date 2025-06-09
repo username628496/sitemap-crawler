@@ -30,6 +30,7 @@
   <script src="https://unpkg.com/@fortawesome/fontawesome-free/js/all.js" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="https://unpkg.com/nprogress@0.2.0/nprogress.css" />
   <script src="https://unpkg.com/nprogress@0.2.0/nprogress.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-softbg text-softgray font-sans min-h-screen">
   <div class="max-w-3xl mx-auto p-6">
@@ -37,18 +38,21 @@
       <h1 class="text-3xl font-semibold inline-flex items-center justify-center gap-2 relative group cursor-pointer">
         Sitemap URL Crawler - SEO 1
         <span class="text-sm text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-300 inline-flex items-center gap-1">
-          V2
+          V3
           <i class="fas fa-circle-info text-gray-400"></i>
         </span>
     
         <!-- Tooltip Box -->
         <div class="absolute top-full mt-3 left-1/2 transform -translate-x-1/2 z-50 hidden group-hover:block group-focus:block w-[320px] text-left text-sm bg-white border border-gray-200 rounded-lg shadow-md p-4 text-gray-700">
-          <strong class="text-gray-800 block mb-2">Thông Tin Version 2</strong>
+          <strong class="text-gray-800 block mb-2">Tính năng nổi bật</strong>
           <ul class="list-disc list-inside space-y-1 text-[13px]">
             <li>Crawl nhiều domain cùng lúc</li>
+            <li>Crawl cả domain có www và không www</li>
             <li>Xử lý nhanh hơn</li>
             <li>Có tiến trình và thời gian rõ ràng</li>
             <li>Báo lỗi khi domain bị Cloudflare chặn</li>
+            <li>Lọc và tìm kiếm lịch sử nâng cao</li>
+            <li>Phân tích so sánh các domain</li>
           </ul>
         </div>
       </h1>
@@ -83,9 +87,62 @@
 
     <section id="results" class="mt-6 space-y-4"></section>
 
+    <!-- Enhanced History Section -->
     <section class="mt-10">
-      <h2 class="text-lg font-semibold mb-4">Lịch sử Crawl</h2>
+      <div class="flex flex-wrap items-center justify-between mb-6">
+        <h2 class="text-lg font-semibold">Lịch sử Crawl</h2>
+        <div class="flex gap-2">
+          <button onclick="showStatistics()" class="bg-[#dc8863] hover:bg-[#cf7a5b] text-white font-semibold px-3 py-1.5 text-xs rounded-md shadow inline-flex items-center gap-1">
+            <i class="fas fa-chart-bar"></i>
+            Thống kê
+          </button>
+          <button onclick="exportHistory()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 text-xs rounded-md shadow inline-flex items-center gap-1">
+            <i class="fas fa-download"></i>
+            Export
+          </button>
+        </div>
+      </div>
+
+      <!-- Advanced Filters -->
+      <div class="bg-white border border-lightborder shadow-soft rounded-xl p-4 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Tìm domain:</label>
+            <input type="text" id="domainFilter" placeholder="example.com" 
+                   class="w-full border border-lightborder rounded px-2 py-1.5 text-sm bg-softbg outline-none focus:ring-accent focus:border-accent">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Trạng thái:</label>
+            <select id="statusFilter" class="w-full border border-lightborder rounded px-2 py-1.5 text-sm bg-softbg outline-none focus:ring-accent focus:border-accent">
+              <option value="">Tất cả</option>
+              <option value="success">Thành công</option>
+              <option value="failed">Thất bại</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Từ ngày:</label>
+            <input type="date" id="dateFrom" 
+                   class="w-full border border-lightborder rounded px-2 py-1.5 text-sm bg-softbg outline-none focus:ring-accent focus:border-accent">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Đến ngày:</label>
+            <input type="date" id="dateTo" 
+                   class="w-full border border-lightborder rounded px-2 py-1.5 text-sm bg-softbg outline-none focus:ring-accent focus:border-accent">
+          </div>
+        </div>
+        <div class="flex gap-2 mt-3">
+          <button onclick="applyFilters()" class="bg-[#dc8863] hover:bg-[#cf7a5b] text-white font-semibold px-3 py-1.5 text-xs rounded-md shadow">
+            <i class="fas fa-filter"></i> Lọc
+          </button>
+          <button onclick="clearFilters()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold px-3 py-1.5 text-xs rounded-md shadow">
+            <i class="fas fa-times"></i> Xóa bộ lọc
+          </button>
+        </div>
+      </div>
+
+      <!-- History Results -->
       <div id="history" class="space-y-2 text-sm"></div>
+      <div id="historyPagination" class="mt-4 text-center"></div>
     </section>
 
     <footer class="text-center text-xs text-gray-500 mt-10">
@@ -93,7 +150,65 @@
     </footer>
   </div>
 
+  <!-- Statistics Modal -->
+  <div id="statisticsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+      <div class="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-semibold text-gray-800">Thống kê Crawl</h3>
+            <button onclick="closeStatistics()" class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          
+          <!-- Stats Overview -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+              <div class="text-xs text-blue-600 font-medium">Tổng Crawls</div>
+              <div id="totalCrawls" class="text-2xl font-bold text-blue-800">-</div>
+            </div>
+            <div class="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+              <div class="text-xs text-green-600 font-medium">Tỷ lệ thành công</div>
+              <div id="successRate" class="text-2xl font-bold text-green-800">-</div>
+            </div>
+            <div class="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+              <div class="text-xs text-purple-600 font-medium">Tổng URLs</div>
+              <div id="totalUrls" class="text-2xl font-bold text-purple-800">-</div>
+            </div>
+            <div class="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
+              <div class="text-xs text-orange-600 font-medium">TB URLs/Crawl</div>
+              <div id="avgUrls" class="text-2xl font-bold text-orange-800">-</div>
+            </div>
+          </div>
+
+          <!-- Charts -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <h4 class="font-medium text-gray-700 mb-3">Hoạt động hàng ngày</h4>
+              <canvas id="dailyActivityChart" width="300" height="200"></canvas>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <h4 class="font-medium text-gray-700 mb-3">Top Domains</h4>
+              <div id="topDomains" class="space-y-2"></div>
+            </div>
+          </div>
+
+          <!-- Common Errors -->
+          <div class="mt-6 bg-red-50 p-4 rounded-lg">
+            <h4 class="font-medium text-red-700 mb-3">Lỗi thường gặp</h4>
+            <div id="commonErrors" class="space-y-1 text-sm"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
+    let historyOffset = 0;
+    const historyLimit = 20;
+    let currentFilters = {};
+    
     function toggleTheme() {
       document.documentElement.classList.toggle('dark');
     }
@@ -107,6 +222,9 @@
       status.innerHTML = "";
       let completed = 0;
       const total = domains.length;
+      
+      // Clear filters to ensure new crawl results are visible in history
+      clearFilters();
     
       NProgress.start();
       NProgress.set(0);
@@ -167,6 +285,7 @@
             <div class="flex items-center gap-2">
               ${statusBadge}
               ${copyBtn}
+              ${site.status === "success" ? `<button onclick="compareDomain('${site.domain}')" class="inline-flex items-center px-2 py-1 bg-[#dc8863] hover:bg-[#cf7a5b] text-white text-xs rounded shadow"><i class="fas fa-chart-line mr-1"></i>So sánh</button>` : ''}
             </div>
           </div>`;
     
@@ -184,7 +303,7 @@
                 <button onclick="document.getElementById('${uid}').classList.toggle('hidden')"
                   class="w-full text-left px-4 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-medium rounded-t flex justify-between items-center">
                   <span><i class="fas fa-sitemap mr-2"></i><a href="${sm.sitemap}" target="_blank" class="underline">${sm.sitemap}</a></span>
-                  <span class="text-sm">(${sm.urls.length} URLs, ${sm.duration}s)</span>
+                  <span class="text-sm">(${sm.urls.length} URLs • ${formatDuration(sm.duration || 0)})</span>
                 </button>
                 <div id="${uid}" class="hidden max-h-60 overflow-y-auto px-4 py-2 bg-white dark:bg-gray-900 text-sm border-t border-yellow-200">
                   ${sm.urls.map(url => `<div><a href="${url}" target="_blank" class="text-blue-500 hover:underline">${url}</a></div>`).join('')}
@@ -195,7 +314,9 @@
     
         card.innerHTML = content;
         results.appendChild(card);
-        loadHistory();
+        
+        // Refresh history immediately after each successful crawl
+        refreshHistoryAfterCrawl();
     
         completed++;
         NProgress.set(completed / total);
@@ -222,6 +343,32 @@
                 ${failedDomains.length > 0 ? `<hr class="my-2 border-gray-300 dark:border-gray-600" /><strong class="text-red-600">❌ Thất bại:</strong><br><div class="text-red-700">${failedFormatted}</div>` : ``}
               </div>
             </div>`;
+          
+          // Final refresh of history to show all new crawls at the top
+          setTimeout(() => {
+            refreshHistoryAfterCrawl();
+            
+            // Show success message with count
+            setTimeout(() => {
+              Swal.fire({
+                icon: 'success',
+                title: 'Crawl hoàn tất!',
+                html: `
+                  <div class="text-center">
+                    <p class="mb-2">Đã crawl thành công <strong>${successDomains.length}</strong> domain</p>
+                    <p class="text-sm text-gray-500">Lịch sử đã được cập nhật với dữ liệu mới nhất</p>
+                  </div>
+                `,
+                timer: 3000,
+                showConfirmButton: false,
+                position: 'top-end',
+                toast: true,
+                background: '#f0fdf4',
+                color: '#166534'
+              });
+            }, 800);
+          }, 500);
+          
           source.close();
         }
       };
@@ -237,55 +384,54 @@
     }
     
     function copyAllUrls() {
-  const links = document.querySelectorAll("#results a");
-  const urlSet = new Set(Array.from(links).map(a => a.href));
-  const uniqueUrls = Array.from(urlSet);
+      const links = document.querySelectorAll("#results a");
+      const urlSet = new Set(Array.from(links).map(a => a.href).filter(href => !/sitemap(_index)?\.xml/i.test(href)));
+      const uniqueUrls = Array.from(urlSet);
 
-  if (uniqueUrls.length === 0) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'Chưa có URLs nào',
-      text: 'Anh em crawl sitemap trước nha!',
-      background: '#FAFAF9',
-      color: '#444',
-      position: 'center',
-      confirmButtonText: 'OK',
-      customClass: {
-        popup: 'rounded-xl border border-gray-200 shadow-sm px-6 py-5',
-        title: 'text-base font-semibold text-yellow-600',
-        confirmButton: 'bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 focus:outline-none'
+      if (uniqueUrls.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Chưa có URLs nào',
+          text: 'Anh em crawl sitemap trước nha!',
+          background: '#FAFAF9',
+          color: '#444',
+          position: 'center',
+          confirmButtonText: 'OK',
+          customClass: {
+            popup: 'rounded-xl border border-gray-200 shadow-sm px-6 py-5',
+            title: 'text-base font-semibold text-yellow-600',
+            confirmButton: 'bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 focus:outline-none'
+          }
+        });
+        return;
       }
-    });
-    return;
-  }
 
-  navigator.clipboard.writeText(uniqueUrls.join("\n")).then(() => {
-    Swal.fire({
-      icon: 'success',
-      title: 'Đã sao chép thành công',
-      html: `
-        <p class="text-base text-gray-600">
-          <strong>${uniqueUrls.length}</strong> URL duy nhất đã được sao chép.
-        </p>
-        <p class="mt-2 text-sm text-gray-500">Chúc anh em <strong class="font-semibold">SEO 1</strong> on top bền vững 💪</p>`,
-      background: '#FAFAF9',
-      color: '#444',
-      showConfirmButton: false,
-      timer: 3500,
-      timerProgressBar: true,
-      position: 'center',
-      customClass: {
-        popup: 'rounded-xl border border-gray-200 shadow-md px-6 py-6',
-        title: 'text-lg font-semibold text-green-700'
-      },
-      didOpen: (toast) => {
-        toast.addEventListener('mouseenter', Swal.stopTimer);
-        toast.addEventListener('mouseleave', Swal.resumeTimer);
-      }
-    });
-  });
-}
-    
+      navigator.clipboard.writeText(uniqueUrls.join("\n")).then(() => {
+        Swal.fire({
+          icon: 'success',
+          title: 'Đã sao chép thành công',
+          html: `
+            <p class="text-base text-gray-600">
+              <strong>${uniqueUrls.length}</strong> URL duy nhất đã được sao chép.
+            </p>
+            <p class="mt-2 text-sm text-gray-500">Chúc anh em <strong class="font-semibold">SEO 1</strong> on top bền vững 💪</p>`,
+          background: '#FAFAF9',
+          color: '#444',
+          showConfirmButton: false,
+          timer: 3500,
+          timerProgressBar: true,
+          position: 'center',
+          customClass: {
+            popup: 'rounded-xl border border-gray-200 shadow-md px-6 py-6',
+            title: 'text-lg font-semibold text-green-700'
+          },
+          didOpen: (toast) => {
+            toast.addEventListener('mouseenter', Swal.stopTimer);
+            toast.addEventListener('mouseleave', Swal.resumeTimer);
+          }
+        });
+      });
+    }
     
     async function exportCSV() {
       const links = document.querySelectorAll("#results a");
@@ -304,48 +450,376 @@
       a.click();
       a.remove();
     }
-    
-    async function loadHistory() {
-  const res = await fetch("/api/history");
-  const data = await res.json();
-  const history = document.getElementById("history");
 
-  if (!Array.isArray(data) || data.length === 0) {
-    history.innerHTML = `<div class="text-gray-500 text-sm italic">Chưa có lịch sử nào.</div>`;
-    return;
-  }
+    // Auto-refresh history after crawl with latest data
+    function refreshHistoryAfterCrawl() {
+      // Show loading indicator
+      const historySection = document.getElementById("history");
+      historySection.innerHTML = `
+        <div class="text-center py-4">
+          <i class="fas fa-spinner fa-spin mr-2"></i>
+          <span class="text-sm text-gray-500">Đang cập nhật lịch sử...</span>
+        </div>
+      `;
+      
+      // Clear filters to show latest results
+      currentFilters = {};
+      historyOffset = 0;
+      
+      // Refresh after short delay to ensure database is updated
+      setTimeout(() => {
+        loadHistory(true);
+      }, 300);
+    }
 
-  history.innerHTML = data.map(record => {
-    const isSuccess = record.status === "success";
-    const badgeClass = isSuccess ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700";
-    const badgeText = isSuccess ? "✔️ Thành công" : "❌ Thất bại";
+    // Enhanced History Functions
+    function applyFilters() {
+      currentFilters = {
+        domain: document.getElementById('domainFilter').value.trim(),
+        status: document.getElementById('statusFilter').value,
+        date_from: document.getElementById('dateFrom').value,
+        date_to: document.getElementById('dateTo').value
+      };
+      historyOffset = 0;
+      loadHistory(true);
+    }
 
-    // Format timestamp cho đẹp
-    const timestamp = new Date(record.timestamp).toLocaleString("vi-VN", {
-      timeZone: "Asia/Ho_Chi_Minh",
-      hour12: false
+    function clearFilters() {
+      document.getElementById('domainFilter').value = '';
+      document.getElementById('statusFilter').value = '';
+      document.getElementById('dateFrom').value = '';
+      document.getElementById('dateTo').value = '';
+      currentFilters = {};
+      historyOffset = 0;
+      loadHistory(true);
+    }
+
+    async function loadHistory(reset = false) {
+      try {
+        const params = new URLSearchParams({
+          limit: historyLimit,
+          offset: historyOffset,
+          ...currentFilters
+        });
+
+        const res = await fetch(`/api/history?${params}`);
+        const data = await res.json();
+        const history = document.getElementById("history");
+
+        if ((!data.results || data.results.length === 0) && reset) {
+          history.innerHTML = `<div class="text-gray-500 text-sm italic">Không tìm thấy kết quả nào.</div>`;
+          document.getElementById("historyPagination").innerHTML = '';
+          return;
+        }
+
+        // Add header row for better UX (hide on mobile)
+        const headerHtml = `
+        
+        `;
+
+        const html = data.results.map((record, index) => {
+          const isSuccess = record.status === "success";
+          const badgeClass = isSuccess ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700";
+          const badgeText = isSuccess ? "✔️ Thành công" : "❌ Thất bại";
+          
+          // Compact timestamp format
+          const date = new Date(record.timestamp);
+          const compactTime = date.toLocaleString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit', 
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          
+          const orderNum = historyOffset + index + 1;
+          
+          // Truncate domain if too long
+          const displayDomain = record.domain.length > 35 ? record.domain.substring(0, 35) + '...' : record.domain;
+          
+          return `
+            <div class="flex items-center justify-between px-3 py-2 border rounded shadow-sm bg-white dark:bg-gray-800 hover:shadow-md transition-all text-sm gap-3">
+              <!-- Order + Time -->
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <div class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-[#dc8863] text-white">#${orderNum}</div>
+                <span class="text-gray-500 text-xs whitespace-nowrap">${compactTime}</span>
+              </div>
+              
+              <!-- Domain -->
+              <div class="flex-1 min-w-0">
+                <a href="https://${record.domain}" target="_blank" 
+                   class="text-blue-600 font-semibold hover:underline flex items-center"
+                   title="${record.domain}">
+                  <i class="fas fa-globe mr-1 flex-shrink-0"></i>
+                  <span class="truncate">${displayDomain}</span>
+                </a>
+              </div>
+              
+              <!-- Stats -->
+              <div class="text-gray-500 text-xs whitespace-nowrap flex-shrink-0">
+                <span>${record.total_urls || record.url_count || 0} URL • ${formatDuration(record.duration_sec || 0)}</span>
+              </div>
+              
+              <!-- Status + Action -->
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${badgeClass} whitespace-nowrap">
+                  ${badgeText}
+                </span>
+                ${isSuccess ? `<button onclick="compareDomain('${record.domain}')" class="inline-flex items-center px-2 py-0.5 bg-[#dc8863] hover:bg-[#cf7a5b] text-white text-xs rounded flex-shrink-0" title="So sánh domain"><i class="fas fa-chart-line"></i></button>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        if (reset) {
+          history.innerHTML = headerHtml + html;
+        } else {
+          history.insertAdjacentHTML('beforeend', html);
+        }
+
+        // Update pagination
+        updatePagination(data.total, data.limit, data.offset);
+
+      } catch (error) {
+        console.error('Error loading history:', error);
+        document.getElementById("history").innerHTML = `<div class="text-red-500 text-sm">Lỗi tải lịch sử: ${error.message}</div>`;
+      }
+    }
+
+    // Format duration for better display
+    function formatDuration(seconds) {
+      if (seconds < 1) {
+        return (seconds * 1000).toFixed(0) + 'ms';
+      } else if (seconds < 10) {
+        return seconds.toFixed(1) + 's';
+      } else if (seconds < 60) {
+        return seconds.toFixed(0) + 's';
+      } else {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = (seconds % 60).toFixed(0);
+        return `${minutes}m ${remainingSeconds}s`;
+      }
+    }
+
+    function updatePagination(total, limit, offset) {
+      const pagination = document.getElementById("historyPagination");
+      const currentPage = Math.floor(offset / limit) + 1;
+      const totalPages = Math.ceil(total / limit);
+
+      if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+      }
+
+      let paginationHTML = '<div class="flex justify-center items-center gap-2 text-sm">';
+      
+      // Previous button
+      if (currentPage > 1) {
+        paginationHTML += `<button onclick="goToPage(${currentPage - 1})" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-gray-700"><i class="fas fa-chevron-left"></i></button>`;
+      }
+
+      // Page numbers
+      for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+        const isActive = i === currentPage;
+        paginationHTML += `<button onclick="goToPage(${i})" class="px-3 py-1 rounded ${isActive ? 'bg-[#dc8863] text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">${i}</button>`;
+      }
+
+      // Next button
+      if (currentPage < totalPages) {
+        paginationHTML += `<button onclick="goToPage(${currentPage + 1})" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-gray-700"><i class="fas fa-chevron-right"></i></button>`;
+      }
+
+      paginationHTML += `<span class="text-gray-500 ml-3">Trang ${currentPage}/${totalPages} (${total} kết quả)</span></div>`;
+      pagination.innerHTML = paginationHTML;
+    }
+
+    function goToPage(page) {
+      historyOffset = (page - 1) * historyLimit;
+      loadHistory(true);
+    }
+
+    async function showStatistics() {
+      try {
+        const res = await fetch('/api/history/statistics?days=30');
+        const stats = await res.json();
+        
+        // Update basic stats
+        document.getElementById('totalCrawls').textContent = stats.basic?.total_crawls || 0;
+        document.getElementById('successRate').textContent = (stats.basic?.success_rate || 0) + '%';
+        document.getElementById('totalUrls').textContent = (stats.basic?.total_urls_found || 0).toLocaleString();
+        document.getElementById('avgUrls').textContent = (stats.basic?.avg_urls_per_crawl || 0).toFixed(1);
+
+        // Update top domains
+        const topDomainsHtml = (stats.top_domains || []).map(domain => 
+          `<div class="flex justify-between items-center p-2 bg-white rounded border">
+            <span class="font-medium text-blue-600 truncate" title="${domain.domain}">${domain.domain.length > 20 ? domain.domain.substring(0, 20) + '...' : domain.domain}</span>
+            <span class="text-sm text-gray-500 whitespace-nowrap">${domain.crawl_count} lần • ${domain.total_urls || 0} URLs</span>
+          </div>`
+        ).join('') || '<div class="text-gray-500 text-sm">Chưa có dữ liệu</div>';
+        document.getElementById('topDomains').innerHTML = topDomainsHtml;
+
+        // Update common errors
+        const errorsHtml = (stats.common_errors || []).map(error => 
+          `<div class="flex justify-between items-center">
+            <span class="text-red-600">${error.error}</span>
+            <span class="text-sm font-medium">${error.count} lần</span>
+          </div>`
+        ).join('') || '<div class="text-gray-500 text-sm">Không có lỗi nào</div>';
+        document.getElementById('commonErrors').innerHTML = errorsHtml;
+
+        // Create daily activity chart
+        createDailyChart(stats.daily_activity || []);
+
+        document.getElementById('statisticsModal').classList.remove('hidden');
+      } catch (error) {
+        Swal.fire('Lỗi', 'Không thể tải thống kê: ' + error.message, 'error');
+      }
+    }
+
+    function createDailyChart(data) {
+      const ctx = document.getElementById('dailyActivityChart').getContext('2d');
+      
+      // Destroy existing chart if it exists
+      if (window.dailyChart) {
+        window.dailyChart.destroy();
+      }
+
+      window.dailyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.map(d => new Date(d.date).toLocaleDateString('vi-VN')),
+          datasets: [{
+            label: 'Crawls',
+            data: data.map(d => d.crawls),
+            borderColor: '#dc8863',
+            backgroundColor: 'rgba(220, 136, 99, 0.1)',
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            }
+          }
+        }
+      });
+    }
+
+    function closeStatistics() {
+      document.getElementById('statisticsModal').classList.add('hidden');
+    }
+
+    async function compareDomain(domain) {
+      try {
+        const res = await fetch(`/api/history/compare/${domain}`);
+        const comparison = await res.json();
+        
+        if (comparison.message) {
+          Swal.fire('Thông báo', comparison.message, 'info');
+          return;
+        }
+
+        const trendsHtml = comparison.trends ? `
+          <div class="mt-4 p-4 bg-gray-50 rounded">
+            <h4 class="font-medium mb-2">Xu hướng so với lần crawl trước:</h4>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <span class="text-sm text-gray-600">Thay đổi URLs:</span>
+                <div class="font-bold ${comparison.trends.url_change >= 0 ? 'text-green-600' : 'text-red-600'}">
+                  ${comparison.trends.url_change >= 0 ? '+' : ''}${comparison.trends.url_change} 
+                  (${comparison.trends.url_change_percent >= 0 ? '+' : ''}${comparison.trends.url_change_percent}%)
+                </div>
+              </div>
+              <div>
+                <span class="text-sm text-gray-600">Thay đổi thời gian:</span>
+                <div class="font-bold ${comparison.trends.duration_change >= 0 ? 'text-red-600' : 'text-green-600'}">
+                  ${comparison.trends.duration_change >= 0 ? '+' : ''}${formatDuration(Math.abs(comparison.trends.duration_change))}
+                  (${comparison.trends.duration_change_percent >= 0 ? '+' : ''}${comparison.trends.duration_change_percent}%)
+                </div>
+              </div>
+            </div>
+          </div>
+        ` : '';
+
+        const crawlsHtml = comparison.crawls.map((crawl, index) => `
+          <div class="flex justify-between items-center p-2 ${index === 0 ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'} border rounded">
+            <span class="text-sm">${new Date(crawl.timestamp).toLocaleString('vi-VN', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})}</span>
+            <span class="font-medium">${crawl.total_urls} URLs • ${formatDuration(crawl.duration || 0)}</span>
+            <span class="text-xs px-2 py-1 rounded ${crawl.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+              ${crawl.status === 'success' ? 'Thành công' : 'Thất bại'}
+            </span>
+          </div>
+        `).join('');
+
+        Swal.fire({
+          title: `So sánh crawls cho ${domain}`,
+          html: `
+            <div class="text-left">
+              <h4 class="font-medium mb-3">Lịch sử crawl gần đây:</h4>
+              <div class="space-y-2 mb-4">
+                ${crawlsHtml}
+              </div>
+              ${trendsHtml}
+            </div>
+          `,
+          width: 600,
+          showConfirmButton: true,
+          confirmButtonText: 'Đóng'
+        });
+      } catch (error) {
+        Swal.fire('Lỗi', 'Không thể so sánh: ' + error.message, 'error');
+      }
+    }
+
+    async function exportHistory() {
+      try {
+        const res = await fetch('/api/history/export?format=csv&days=30');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'crawl_history.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        
+        Swal.fire({
+          icon: 'success',
+          title: 'Đã export thành công!',
+          text: 'File CSV đã được tải xuống',
+          timer: 2000,
+          showConfirmButton: false
+        });
+      } catch (error) {
+        Swal.fire('Lỗi', 'Không thể export: ' + error.message, 'error');
+      }
+    }
+
+    // Initialize filters to use current date range
+    function initializeDateFilters() {
+      const today = new Date();
+      const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      
+      document.getElementById('dateTo').value = today.toISOString().split('T')[0];
+      document.getElementById('dateFrom').value = lastWeek.toISOString().split('T')[0];
+    }
+
+    // Event listeners
+    document.getElementById('domainFilter').addEventListener('keyup', function(e) {
+      if (e.key === 'Enter') applyFilters();
     });
 
-    return `
-      <div class="flex flex-wrap sm:flex-nowrap justify-between items-center px-4 py-2 border rounded shadow-sm bg-white dark:bg-gray-800 hover:shadow-md transition-all text-sm">
-        <div class="flex flex-wrap items-center gap-2 text-gray-700 dark:text-gray-300">
-          <span class="text-gray-500"><i class="far fa-clock mr-1"></i>${timestamp}</span>
-          <a href="https://${record.domain}" target="_blank" class="text-blue-600 font-semibold hover:underline">
-            <i class="fas fa-globe mr-1"></i>${record.domain}
-          </a>
-          <span class="text-gray-500">${record.url_count} URL • ${record.duration_sec}s</span>
-        </div>
-        <div class="mt-2 sm:mt-0 sm:ml-4">
-          <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${badgeClass}">
-            ${badgeText}
-          </span>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-    
-    window.onload = loadHistory;
-    </script>
+    window.onload = function() {
+      initializeDateFilters();
+      loadHistory(true);
+    };
+  </script>
 </body>
 </html>
